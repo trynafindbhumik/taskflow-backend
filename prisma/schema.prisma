@@ -1,0 +1,125 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(uuid())
+  name          String
+  email         String    @unique
+  password_hash String
+  is_verified   Boolean   @default(false)
+  refresh_token String?
+  created_at    DateTime  @default(now())
+  updated_at    DateTime  @updatedAt
+
+  owned_projects   Projects[]          @relation("ProjectOwner")
+  memberships      ProjectMember[]
+  assigned_tasks   Task[]              @relation("TaskAssignee")
+  created_tasks    Task[]              @relation("TaskCreator")
+  created_subtasks Subtask[]           @relation("SubtaskCreator")
+  notifications    Notification[]
+  sent_invitations ProjectInvitation[] @relation("InviterUser")
+
+  @@map("users")
+}
+
+model Projects {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  owner_id    String
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  owner       User                @relation("ProjectOwner", fields: [owner_id], references: [id], onDelete: Cascade)
+  members     ProjectMember[]
+  tasks       Task[]
+  invitations ProjectInvitation[]
+
+  @@map("projects")
+}
+
+model ProjectMember {
+  project_id String
+  user_id    String
+  role       String   @default("member") // "owner" | "member"
+  joined_at  DateTime @default(now())
+
+  project Projects @relation(fields: [project_id], references: [id], onDelete: Cascade)
+  user    User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@id([project_id, user_id])
+  @@map("project_members")
+}
+
+model Task {
+  id          String    @id @default(uuid())
+  title       String
+  description String?
+  status      String    @default("todo") // "todo" | "in_progress" | "done"
+  priority    String    @default("medium") // "low" | "medium" | "high"
+  project_id  String
+  assignee_id String?
+  creator_id  String?
+  due_date    String?   // ISO string e.g. "2024-05-01"
+  created_at  DateTime  @default(now())
+  updated_at  DateTime  @updatedAt
+
+  project  Projects  @relation(fields: [project_id], references: [id], onDelete: Cascade)
+  assignee User?     @relation("TaskAssignee", fields: [assignee_id], references: [id], onDelete: SetNull)
+  creator  User?     @relation("TaskCreator", fields: [creator_id], references: [id], onDelete: SetNull)
+  subtasks Subtask[]
+
+  @@map("tasks")
+}
+
+model Subtask {
+  id         String   @id @default(uuid())
+  task_id    String
+  title      String
+  completed  Boolean  @default(false)
+  creator_id String?
+  created_at DateTime @default(now())
+
+  task    Task  @relation(fields: [task_id], references: [id], onDelete: Cascade)
+  creator User? @relation("SubtaskCreator", fields: [creator_id], references: [id], onDelete: SetNull)
+
+  @@map("subtasks")
+}
+
+model Notification {
+  id         String   @id @default(uuid())
+  user_id    String
+  title      String
+  message    String
+  read       Boolean  @default(false)
+  type       String   // "task_assigned" | "task_updated" | "project_invite" | "deadline"
+  link       String?
+  created_at DateTime @default(now())
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@map("notifications")
+}
+
+
+model ProjectInvitation {
+  id         String   @id @default(uuid())
+  project_id String
+  inviter_id String
+  email      String
+  token      String   @unique
+  status     String   @default("pending") // "pending" | "accepted" | "rejected"
+  created_at DateTime @default(now())
+  expires_at DateTime
+
+  project Projects @relation(fields: [project_id], references: [id], onDelete: Cascade)
+  inviter User     @relation("InviterUser", fields: [inviter_id], references: [id], onDelete: Cascade)
+
+  @@map("project_invitations")
+}
