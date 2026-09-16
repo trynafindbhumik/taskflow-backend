@@ -1,3 +1,6 @@
+/**
+ * Base HTTP Operational Error class extended by specialized application errors.
+ */
 export class AppError extends Error {
   public readonly statusCode: number;
   public readonly errors?: any;
@@ -49,3 +52,10 @@ export class TooManyRequestsError extends AppError {
     this.retryAfter = retryAfter;
   }
 }
+
+export class ServiceUnavailableError extends AppError {
+  constructor(message: string = 'Service Unavailable') {
+    super(message, 503);
+  }
+}
+
