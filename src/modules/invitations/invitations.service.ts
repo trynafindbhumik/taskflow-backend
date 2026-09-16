@@ -13,7 +13,13 @@ import {
 const JWT_SECRET = process.env.JWT_SECRET || 'taskflow_super_secret_jwt_key_2026';
 const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'taskflow_super_secret_refresh_key_2026';
 
+/**
+ * Business logic service for project invitations and user acceptance onboarding.
+ */
 export class InvitationsService {
+  /**
+   * Retrieves invitation details by token and evaluates expiration status.
+   */
   static async getInvitationByToken(token: string) {
     const invitation = await prisma.projectInvitation.findUnique({
       where: { token },
@@ -47,6 +53,9 @@ export class InvitationsService {
     };
   }
 
+  /**
+   * Accepts a project invitation, handling both new user registration and existing user auth verification.
+   */
   static async acceptInvitation(token: string, body: { name?: string; password?: string }, authHeader?: string, authenticatedUserId?: string) {
     const invitation = await prisma.projectInvitation.findUnique({
       where: { token },
@@ -71,7 +80,7 @@ export class InvitationsService {
     });
 
     if (!existingUser) {
-      // NEW USER FLOW
+      // New user registration flow
       const { name, password } = body;
       if (!name || !password) {
         throw new BadRequestError('Full name and password are required to create your account and accept the invitation.');
@@ -143,7 +152,7 @@ export class InvitationsService {
       };
     }
 
-    // EXISTING USER FLOW
+    // Existing user acceptance flow
     let userId = authenticatedUserId;
     if (!userId && authHeader && authHeader.startsWith('Bearer ')) {
       const bearerToken = authHeader.split(' ')[1];
@@ -151,7 +160,7 @@ export class InvitationsService {
         const decoded = jwt.verify(bearerToken, JWT_SECRET) as any;
         userId = decoded.id;
       } catch {
-        // Token invalid
+        // Token invalid or expired
       }
     }
 
@@ -204,6 +213,9 @@ export class InvitationsService {
     };
   }
 
+  /**
+   * Declines a pending invitation.
+   */
   static async rejectInvitation(token: string) {
     const invitation = await prisma.projectInvitation.findUnique({
       where: { token },

@@ -6,6 +6,9 @@ let io: SocketIOServer | null = null;
 
 const JWT_SECRET = process.env.JWT_SECRET || 'taskflow_super_secret_jwt_key_2026';
 
+/**
+ * Initializes Socket.IO server with JWT handshake authentication and room management.
+ */
 export function initSocketIO(server: HttpServer) {
   io = new SocketIOServer(server, {
     cors: {
@@ -51,10 +54,16 @@ export function initSocketIO(server: HttpServer) {
   return io;
 }
 
+/**
+ * Returns the active Socket.IO server instance.
+ */
 export function getIO(): SocketIOServer | null {
   return io;
 }
 
+/**
+ * Emits a real-time notification event to a specific user room.
+ */
 export function emitNotificationToUser(userId: string, notification: any) {
   if (io) {
     io.to(`user:${userId}`).emit('notification', notification);

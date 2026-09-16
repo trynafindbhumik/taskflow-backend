@@ -19,15 +19,34 @@ export class TasksService {
       throw new NotFoundError('Task not found');
     }
 
+    const isTaskCreator = existingTask.creator_id === currentUserId;
+    const isProjectOwner = existingTask.project.owner_id === currentUserId;
+    const canEditDetails = isTaskCreator || isProjectOwner;
+
+    // Non-creators / non-project owners can ONLY update status
+    if (!canEditDetails) {
+      if (
+        title !== undefined ||
+        description !== undefined ||
+        priority !== undefined ||
+        due_date !== undefined ||
+        assignee_id !== undefined
+      ) {
+        throw new ForbiddenError(
+          'Only the task creator or project owner can edit task details. Non-owners can only update task status.'
+        );
+      }
+    }
+
     const updateData: any = {};
-    if (title !== undefined) updateData.title = title;
-    if (description !== undefined) updateData.description = description;
+    if (canEditDetails && title !== undefined) updateData.title = title;
+    if (canEditDetails && description !== undefined) updateData.description = description;
     if (status !== undefined) updateData.status = status;
-    if (priority !== undefined) updateData.priority = priority;
-    if (due_date !== undefined) updateData.due_date = due_date;
+    if (canEditDetails && priority !== undefined) updateData.priority = priority;
+    if (canEditDetails && due_date !== undefined) updateData.due_date = due_date;
 
     let targetAssigneeId: string | null = null;
-    if (assignee_id !== undefined) {
+    if (canEditDetails && assignee_id !== undefined) {
       let sanitizedAssigneeId: string | null =
         typeof assignee_id === 'string' &&
         assignee_id.trim() !== '' &&
@@ -52,6 +71,16 @@ export class TasksService {
         .map((st) => st.id)
         .filter((stId) => stId && typeof stId === 'string' && !stId.startsWith('st_'));
 
+      // If user isn't creator/owner, they cannot delete subtasks created by others
+      const existingSubtasks = await prisma.subtask.findMany({ where: { task_id: taskId } });
+      const subtasksToDelete = existingSubtasks.filter((st) => !keepIds.includes(st.id));
+      for (const st of subtasksToDelete) {
+        const isSubtaskCreator = st.creator_id === currentUserId;
+        if (!isSubtaskCreator && !canEditDetails) {
+          throw new ForbiddenError('You can only delete subtasks created by yourself or if you are the project owner');
+        }
+      }
+
       await prisma.subtask.deleteMany({
         where: {
           task_id: taskId,
@@ -74,10 +103,13 @@ export class TasksService {
         } else {
           const existingSt = await prisma.subtask.findUnique({ where: { id: st.id } });
           if (existingSt) {
+            const isSubtaskCreator = existingSt.creator_id === currentUserId;
+            const canEditSubtaskTitle = canEditDetails || isSubtaskCreator;
+            
             await prisma.subtask.update({
               where: { id: st.id },
               data: {
-                title: st.title.trim(),
+                ...(canEditSubtaskTitle && { title: st.title.trim() }),
                 completed: !!st.completed,
               },
             });
@@ -237,15 +269,37 @@ export class TasksService {
     });
   }
 
-  static async updateSubtask(subtaskId: string, data: { completed?: boolean; title?: string }) {
-    const subtask = await prisma.subtask.findUnique({ where: { id: subtaskId } });
+  static async updateSubtask(currentUserId: string, subtaskId: string, data: { completed?: boolean; title?: string }) {
+    const subtask = await prisma.subtask.findUnique({
+      where: { id: subtaskId },
+      include: {
+        task: {
+          select: {
+            creator_id: true,
+            project: { select: { owner_id: true } },
+          },
+        },
+      },
+    });
+
     if (!subtask) {
       throw new NotFoundError('Subtask not found');
     }
 
+    const isSubtaskCreator = subtask.creator_id === currentUserId;
+    const isTaskCreator = subtask.task.creator_id === currentUserId;
+    const isProjectOwner = subtask.task.project.owner_id === currentUserId;
+    const canEditTitle = isSubtaskCreator || isTaskCreator || isProjectOwner;
+
+    if (data.title !== undefined && !canEditTitle) {
+      throw new ForbiddenError(
+        'Only the subtask creator, task creator, or project owner can edit subtask title'
+      );
+    }
+
     const updateData: any = {};
     if (data.completed !== undefined) updateData.completed = data.completed;
-    if (data.title !== undefined) updateData.title = data.title;
+    if (canEditTitle && data.title !== undefined) updateData.title = data.title;
 
     return prisma.subtask.update({
       where: { id: subtaskId },

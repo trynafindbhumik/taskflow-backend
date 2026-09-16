@@ -16,12 +16,10 @@ router.get('/:id', authenticate, ProjectsController.getProjectDetails);
 router.patch('/:id', authenticate, validate(updateProjectSchema), ProjectsController.updateProject);
 router.delete('/:id', authenticate, ProjectsController.deleteProject);
 
-// Members
 router.get('/:id/members', authenticate, ProjectsController.getProjectMembers);
 router.post('/:id/members', authenticate, ProjectsController.inviteMembers);
 router.delete('/:id/members/:userId', authenticate, ProjectsController.removeMember);
 
-// Tasks within Project
 router.get('/:id/tasks', authenticate, ProjectsController.getProjectTasks);
 router.post('/:id/tasks', authenticate, validate(createProjectTaskSchema), ProjectsController.createProjectTask);
 

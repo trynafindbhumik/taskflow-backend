@@ -315,10 +315,16 @@ export class AuthService {
   static async logout(userId?: string) {
     if (userId) {
       await redisService.deleteRefreshToken(userId);
-      await prisma.user.update({
-        where: { id: userId },
-        data: { refresh_token: null },
-      });
+      try {
+        await prisma.user.update({
+          where: { id: userId },
+          data: { refresh_token: null },
+        });
+      } catch (err: any) {
+        if (err?.code !== 'P2025') {
+          throw err;
+        }
+      }
     }
     return { message: 'Logged out successfully' };
   }

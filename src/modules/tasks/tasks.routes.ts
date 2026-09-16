@@ -17,7 +17,6 @@ router.post('/bulk-update', authenticate, validate(bulkUpdateTasksSchema), Tasks
 router.post('/bulk-delete', authenticate, validate(bulkDeleteTasksSchema), TasksController.bulkDelete);
 router.delete('/:id', authenticate, TasksController.deleteTask);
 
-// Atomic Subtask Endpoints
 router.post('/:id/subtasks', authenticate, validate(createSubtaskSchema), TasksController.createSubtask);
 router.patch('/subtasks/:subtaskId', authenticate, validate(updateSubtaskSchema), TasksController.updateSubtask);
 router.delete('/subtasks/:subtaskId', authenticate, TasksController.deleteSubtask);
