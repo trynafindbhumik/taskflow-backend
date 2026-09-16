@@ -24,9 +24,23 @@ app.use(
 
 app.use(express.json());
 
-app.get('/health', (req: Request, res: Response) => {
-  res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
+app.get('/', (req: Request, res: Response) => {
+  res.status(200).json({
+    name: 'TaskFlow API',
+    status: 'ok',
+    message: 'TaskFlow Backend REST API & WebSockets are running smoothly',
+    timestamp: new Date().toISOString(),
+  });
 });
+
+app.get('/health', (req: Request, res: Response) => {
+  res.status(200).json({
+    status: 'ok',
+    uptime: process.uptime(),
+    timestamp: new Date().toISOString(),
+  });
+});
+
 
 app.use(routes);
 
