@@ -2,6 +2,9 @@ import { Request, Response, NextFunction } from 'express';
 import { AppError, TooManyRequestsError } from '../errors/AppError';
 import { ZodError } from 'zod';
 
+/**
+ * Centralized Express error-handling middleware for mapping AppErrors, Zod validation errors, and uncaught exceptions.
+ */
 export function errorHandler(
   err: any,
   req: Request,

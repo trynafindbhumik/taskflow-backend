@@ -66,7 +66,10 @@ export class TasksController {
 
   static async updateSubtask(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
-      const updatedSubtask = await TasksService.updateSubtask(req.params.subtaskId, req.body);
+      const userId = req.user?.id;
+      if (!userId) throw new UnauthorizedError();
+
+      const updatedSubtask = await TasksService.updateSubtask(userId, req.params.subtaskId, req.body);
       return res.status(200).json(updatedSubtask);
     } catch (error) {
       return next(error);

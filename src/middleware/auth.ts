@@ -7,10 +7,16 @@ export interface AuthenticatedUser {
   name?: string;
 }
 
+/**
+ * Express Request extension featuring the authenticated user payload.
+ */
 export interface AuthenticatedRequest extends Request {
   user?: AuthenticatedUser;
 }
 
+/**
+ * Middleware validating Bearer JWT tokens in the Authorization header.
+ */
 export function authenticate(req: AuthenticatedRequest, res: Response, next: NextFunction) {
   const authHeader = req.headers.authorization;
 

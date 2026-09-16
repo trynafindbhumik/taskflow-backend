@@ -4,6 +4,9 @@ const REDIS_HOST = process.env.REDIS_HOST || '127.0.0.1';
 const REDIS_PORT = parseInt(process.env.REDIS_PORT || '6379', 10);
 const REDIS_URL = process.env.REDIS_URL;
 
+/**
+ * Configured IORedis client instance.
+ */
 export const redis = REDIS_URL
   ? new Redis(REDIS_URL)
   : new Redis({
@@ -21,9 +24,11 @@ redis.on('error', (err) => {
   console.warn('⚠️ Redis Error (falling back gracefully):', err.message);
 });
 
-// Helper functions for auth tokens and cooldowns
+/**
+ * Service providing helper methods for managing refresh tokens, rate-limiting cooldowns,
+ * and temporary verification/reset tokens in Redis.
+ */
 export const redisService = {
-  // Refresh Token Session
   async setRefreshToken(userId: string, token: string, ttlSeconds = 7 * 24 * 60 * 60) {
     try {
       await redis.set(`refresh:${userId}`, token, 'EX', ttlSeconds);
@@ -49,7 +54,6 @@ export const redisService = {
     }
   },
 
-  // 60-Second Email Resend Cooldown
   async setResendCooldown(email: string, ttlSeconds = 60) {
     try {
       const key = `cooldown:resend:${email.toLowerCase().trim()}`;
@@ -70,7 +74,6 @@ export const redisService = {
     }
   },
 
-  // Verification Token
   async setVerificationToken(token: string, userId: string, ttlSeconds = 86400) {
     try {
       await redis.set(`verify:${token}`, userId, 'EX', ttlSeconds);
@@ -96,7 +99,6 @@ export const redisService = {
     }
   },
 
-  // Password Reset Token
   async setPasswordResetToken(token: string, userId: string, ttlSeconds = 3600) {
     try {
       await redis.set(`reset:${token}`, userId, 'EX', ttlSeconds);

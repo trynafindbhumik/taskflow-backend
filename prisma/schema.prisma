@@ -24,6 +24,8 @@ model User {
   created_subtasks Subtask[]           @relation("SubtaskCreator")
   notifications    Notification[]
   sent_invitations ProjectInvitation[] @relation("InviterUser")
+  ai_conversations AiConversation[]
+  ai_proposals     AiDraftProposal[]
 
   @@map("users")
 }
@@ -123,3 +125,49 @@ model ProjectInvitation {
 
   @@map("project_invitations")
 }
+
+model AiConversation {
+  id         String   @id @default(uuid())
+  user_id    String
+  title      String
+  share_id   String?  @unique
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  user      User              @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  messages  AiMessage[]
+  proposals AiDraftProposal[]
+
+  @@map("ai_conversations")
+}
+
+model AiMessage {
+  id               String   @id @default(uuid())
+  conversation_id  String
+  role             String   // "user" | "assistant" | "system"
+  content          String   @db.Text
+  executed_actions Json?
+  artifact_type    String?  // "plan" | "stats" | "overdue" | "workload"
+  payload          Json?
+  created_at       DateTime @default(now())
+
+  conversation AiConversation @relation(fields: [conversation_id], references: [id], onDelete: Cascade)
+
+  @@map("ai_messages")
+}
+
+model AiDraftProposal {
+  id              String   @id @default(uuid())
+  user_id         String
+  conversation_id String?
+  status          String   @default("pending") // "pending" | "executed" | "cancelled"
+  proposal_data   Json
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+
+  user         User            @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  conversation AiConversation? @relation(fields: [conversation_id], references: [id], onDelete: Cascade)
+
+  @@map("ai_draft_proposals")
+}
+
