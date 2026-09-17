@@ -14,6 +14,8 @@ import {
 
 const JWT_SECRET = process.env.JWT_SECRET || 'taskflow_super_secret_jwt_key_2026';
 const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'taskflow_super_secret_refresh_key_2026';
+const JWT_EXPIRES_IN = (process.env.JWT_EXPIRES_IN || '7d') as any;
+const JWT_REFRESH_EXPIRES_IN = (process.env.JWT_REFRESH_EXPIRES_IN || '30d') as any;
 
 export function formatUser(user: any) {
   return {
@@ -76,13 +78,13 @@ export class AuthService {
     const accessToken = jwt.sign(
       { id: updatedUser.id, email: updatedUser.email, name: updatedUser.name },
       JWT_SECRET,
-      { expiresIn: '1h' }
+      { expiresIn: JWT_EXPIRES_IN }
     );
 
     const refreshToken = jwt.sign(
       { id: updatedUser.id, email: updatedUser.email },
       JWT_REFRESH_SECRET,
-      { expiresIn: '7d' }
+      { expiresIn: JWT_REFRESH_EXPIRES_IN }
     );
 
     const hashedRefreshToken = await bcrypt.hash(refreshToken, 10);
@@ -95,7 +97,6 @@ export class AuthService {
 
     return {
       message: 'Email successfully verified!',
-      token: accessToken,
       access_token: accessToken,
       refresh_token: refreshToken,
       user: formatUser(updatedUser),
@@ -157,13 +158,13 @@ export class AuthService {
     const accessToken = jwt.sign(
       { id: user.id, email: user.email, name: user.name },
       JWT_SECRET,
-      { expiresIn: '1h' }
+      { expiresIn: JWT_EXPIRES_IN }
     );
 
     const refreshToken = jwt.sign(
       { id: user.id, email: user.email },
       JWT_REFRESH_SECRET,
-      { expiresIn: '7d' }
+      { expiresIn: JWT_REFRESH_EXPIRES_IN }
     );
 
     const hashedRefreshToken = await bcrypt.hash(refreshToken, 10);
@@ -175,7 +176,6 @@ export class AuthService {
     await redisService.setRefreshToken(user.id, refreshToken);
 
     return {
-      token: accessToken,
       access_token: accessToken,
       refresh_token: refreshToken,
       user: formatUser(user),
@@ -206,13 +206,13 @@ export class AuthService {
     const newAccessToken = jwt.sign(
       { id: user.id, email: user.email, name: user.name },
       JWT_SECRET,
-      { expiresIn: '1h' }
+      { expiresIn: JWT_EXPIRES_IN }
     );
 
     const newRefreshToken = jwt.sign(
       { id: user.id, email: user.email },
       JWT_REFRESH_SECRET,
-      { expiresIn: '7d' }
+      { expiresIn: JWT_REFRESH_EXPIRES_IN }
     );
 
     const hashedNewRefreshToken = await bcrypt.hash(newRefreshToken, 10);
@@ -224,7 +224,6 @@ export class AuthService {
     await redisService.setRefreshToken(user.id, newRefreshToken);
 
     return {
-      token: newAccessToken,
       access_token: newAccessToken,
       refresh_token: newRefreshToken,
     };
