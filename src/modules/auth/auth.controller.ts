@@ -47,6 +47,37 @@ export class AuthController {
     }
   }
 
+  static async googleAuth(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const result = await AuthService.googleAuth(req.body);
+      return res.status(200).json(result);
+    } catch (error) {
+      return next(error);
+    }
+  }
+
+  static async connectGoogle(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const userId = req.user?.id;
+      if (!userId) throw new UnauthorizedError();
+      const result = await AuthService.connectGoogle(userId, req.body);
+      return res.status(200).json(result);
+    } catch (error) {
+      return next(error);
+    }
+  }
+
+  static async disconnectGoogle(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const userId = req.user?.id;
+      if (!userId) throw new UnauthorizedError();
+      const result = await AuthService.disconnectGoogle(userId);
+      return res.status(200).json(result);
+    } catch (error) {
+      return next(error);
+    }
+  }
+
   static async refreshToken(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
       const result = await AuthService.refreshToken(req.body.refresh_token);

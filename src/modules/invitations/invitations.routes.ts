@@ -7,6 +7,7 @@ const router = Router();
 
 router.get('/:token', InvitationsController.getInvitationByToken);
 router.post('/:token/accept', validate(acceptInvitationSchema), InvitationsController.acceptInvitation);
+router.post('/:token/accept-google', InvitationsController.acceptInvitationWithGoogle);
 router.post('/:token/reject', InvitationsController.rejectInvitation);
 
 export default router;

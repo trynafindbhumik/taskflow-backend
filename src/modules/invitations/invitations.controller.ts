@@ -35,6 +35,15 @@ export class InvitationsController {
     }
   }
 
+  static async acceptInvitationWithGoogle(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const result = await InvitationsService.acceptInvitationWithGoogle(req.params.token, req.body);
+      return res.status(200).json(result);
+    } catch (error) {
+      return next(error);
+    }
+  }
+
   static async rejectInvitation(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
       const result = await InvitationsService.rejectInvitation(req.params.token);

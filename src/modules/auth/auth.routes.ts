@@ -22,6 +22,10 @@ router.post('/refresh', validate(refreshSchema), AuthController.refreshToken);
 router.post('/forgot-password', validate(forgotPasswordSchema), AuthController.forgotPassword);
 router.post('/reset-password', validate(resetPasswordSchema), AuthController.resetPassword);
 
+router.post('/google', AuthController.googleAuth);
+router.post('/google/connect', authenticate, AuthController.connectGoogle);
+router.post('/google/disconnect', authenticate, AuthController.disconnectGoogle);
+
 router.patch('/profile', authenticate, AuthController.updateProfile);
 router.get('/me', authenticate, AuthController.getProfile);
 router.post('/logout', authenticate, AuthController.logout);
