@@ -23,12 +23,39 @@ export function formatUser(user: any) {
     name: user.name,
     email: user.email,
     is_verified: user.is_verified,
+    google_connected: !!user.google_connected,
+    has_password: !!user.password_hash,
     created_at: user.created_at,
   };
 }
 
 function generateRandomToken(): string {
   return crypto.randomBytes(32).toString('hex');
+}
+
+export function parseGoogleToken(data: { credential?: string; google_id?: string; email?: string; name?: string }) {
+  if (data.credential) {
+    try {
+      const decoded: any = jwt.decode(data.credential);
+      if (decoded && decoded.email) {
+        return {
+          google_id: decoded.sub || decoded.google_id || data.google_id || `google_${decoded.email}`,
+          email: decoded.email.toLowerCase(),
+          name: decoded.name || data.name || decoded.email.split('@')[0],
+        };
+      }
+    } catch {
+      // Fallback if not standard JWT string
+    }
+  }
+  if (data.email) {
+    return {
+      google_id: data.google_id || `google_${data.email.toLowerCase()}`,
+      email: data.email.toLowerCase(),
+      name: data.name || data.email.split('@')[0],
+    };
+  }
+  throw new BadRequestError('Invalid Google credential token or details');
 }
 
 export class AuthService {
@@ -143,6 +170,12 @@ export class AuthService {
       throw new UnauthorizedError('Invalid credentials');
     }
 
+    if (!user.password_hash) {
+      throw new UnauthorizedError(
+        'This account was created with Google SSO. Please log in using Continue with Google, or set a password in profile settings.'
+      );
+    }
+
     const isMatch = await bcrypt.compare(data.password, user.password_hash);
     if (!isMatch) {
       throw new UnauthorizedError('Invalid credentials');
@@ -180,6 +213,128 @@ export class AuthService {
       refresh_token: refreshToken,
       user: formatUser(user),
     };
+  }
+
+  static async googleAuth(data: { credential?: string; google_id?: string; email?: string; name?: string }) {
+    const googleInfo = parseGoogleToken(data);
+
+    let user = await prisma.user.findUnique({
+      where: { email: googleInfo.email },
+    });
+
+    if (user) {
+      if (!user.google_connected) {
+        throw new BadRequestError(
+          'This account was created using email & password. Please log in with your password, or connect Google in your profile settings.'
+        );
+      }
+
+      if (!user.google_id) {
+        user = await prisma.user.update({
+          where: { id: user.id },
+          data: { google_id: googleInfo.google_id },
+        });
+      }
+    } else {
+      user = await prisma.user.create({
+        data: {
+          name: googleInfo.name,
+          email: googleInfo.email,
+          google_id: googleInfo.google_id,
+          google_connected: true,
+          is_verified: true,
+          password_hash: null,
+        },
+      });
+    }
+
+    const accessToken = jwt.sign(
+      { id: user.id, email: user.email, name: user.name },
+      JWT_SECRET,
+      { expiresIn: JWT_EXPIRES_IN }
+    );
+
+    const refreshToken = jwt.sign(
+      { id: user.id, email: user.email },
+      JWT_REFRESH_SECRET,
+      { expiresIn: JWT_REFRESH_EXPIRES_IN }
+    );
+
+    const hashedRefreshToken = await bcrypt.hash(refreshToken, 10);
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { refresh_token: hashedRefreshToken },
+    });
+
+    await redisService.setRefreshToken(user.id, refreshToken);
+
+    return {
+      access_token: accessToken,
+      refresh_token: refreshToken,
+      user: formatUser(user),
+    };
+  }
+
+  static async connectGoogle(userId: string, data: { credential?: string; google_id?: string; email?: string; name?: string }) {
+    const googleInfo = parseGoogleToken(data);
+
+    const currentUser = await prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!currentUser) {
+      throw new NotFoundError('User not found');
+    }
+
+    if (currentUser.email.toLowerCase() !== googleInfo.email.toLowerCase()) {
+      throw new BadRequestError(
+        `The selected Google email (${googleInfo.email}) does not match your TaskFlow account email (${currentUser.email}). Please select your ${currentUser.email} Google account.`
+      );
+    }
+
+    const existingWithGoogle = await prisma.user.findUnique({
+      where: { google_id: googleInfo.google_id },
+    });
+
+    if (existingWithGoogle && existingWithGoogle.id !== userId) {
+      throw new BadRequestError('This Google account is already connected to another TaskFlow user.');
+    }
+
+    const updatedUser = await prisma.user.update({
+      where: { id: userId },
+      data: {
+        google_id: googleInfo.google_id,
+        google_connected: true,
+      },
+    });
+
+    return formatUser(updatedUser);
+  }
+
+  static async disconnectGoogle(userId: string) {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new NotFoundError('User not found');
+    }
+
+    if (!user.password_hash) {
+      throw new BadRequestError(
+        'Please create a password for your account in profile settings before disconnecting your Google account.'
+      );
+    }
+
+    const updatedUser = await prisma.user.update({
+      where: { id: userId },
+      data: {
+        google_connected: false,
+        google_id: null,
+      },
+    });
+
+    return formatUser(updatedUser);
   }
 
   static async refreshToken(refreshTokenInput: string) {
@@ -279,13 +434,15 @@ export class AuthService {
     }
 
     if (data.new_password) {
-      if (!data.current_password) {
-        throw new BadRequestError('Current password is required to set new password');
-      }
+      if (user.password_hash) {
+        if (!data.current_password) {
+          throw new BadRequestError('Current password is required to set new password');
+        }
 
-      const isMatch = await bcrypt.compare(data.current_password, user.password_hash);
-      if (!isMatch) {
-        throw new BadRequestError('Incorrect current password');
+        const isMatch = await bcrypt.compare(data.current_password, user.password_hash);
+        if (!isMatch) {
+          throw new BadRequestError('Incorrect current password');
+        }
       }
 
       updateData.password_hash = await bcrypt.hash(data.new_password, 10);

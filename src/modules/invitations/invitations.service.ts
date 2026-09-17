@@ -1,7 +1,7 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { prisma } from '../../db/prisma';
-import { formatUser } from '../auth/auth.service';
+import { formatUser, parseGoogleToken } from '../auth/auth.service';
 import {
   BadRequestError,
   ForbiddenError,
@@ -238,6 +238,115 @@ export class InvitationsService {
 
     return {
       message: 'Invitation declined.',
+    };
+  }
+
+  /**
+   * Accepts a project invitation via Google SSO.
+   */
+  static async acceptInvitationWithGoogle(token: string, body: { credential?: string; google_id?: string; email?: string; name?: string }) {
+    const googleInfo = parseGoogleToken(body);
+
+    const invitation = await prisma.projectInvitation.findUnique({
+      where: { token },
+      include: { project: true },
+    });
+
+    if (!invitation) {
+      throw new NotFoundError('Invitation not found');
+    }
+
+    if (invitation.status !== 'pending') {
+      throw new BadRequestError(`Invitation is already ${invitation.status}`);
+    }
+
+    if (invitation.expires_at < new Date()) {
+      throw new BadRequestError('Invitation link has expired (invitations are valid for 7 days)');
+    }
+
+    let user = await prisma.user.findUnique({
+      where: { email: googleInfo.email },
+    });
+
+    if (user) {
+      if (!user.google_connected) {
+        throw new BadRequestError(
+          'This account was created using email & password. Please log in with your password to accept this invitation, or connect Google in profile settings.'
+        );
+      }
+
+      if (!user.google_id) {
+        user = await prisma.user.update({
+          where: { id: user.id },
+          data: { google_id: googleInfo.google_id },
+        });
+      }
+    } else {
+      user = await prisma.user.create({
+        data: {
+          name: googleInfo.name,
+          email: googleInfo.email,
+          google_id: googleInfo.google_id,
+          google_connected: true,
+          is_verified: true,
+          password_hash: null,
+        },
+      });
+    }
+
+    const existingMember = await prisma.projectMember.findUnique({
+      where: { project_id_user_id: { project_id: invitation.project_id, user_id: user.id } },
+    });
+
+    if (!existingMember) {
+      await prisma.projectMember.create({
+        data: {
+          project_id: invitation.project_id,
+          user_id: user.id,
+          role: 'member',
+        },
+      });
+    }
+
+    await prisma.projectInvitation.update({
+      where: { id: invitation.id },
+      data: { status: 'accepted' },
+    });
+
+    await prisma.notification.create({
+      data: {
+        user_id: invitation.inviter_id,
+        title: 'Invitation Accepted',
+        message: `${user.name} accepted your invitation to join "${invitation.project.name}" via Google`,
+        type: 'project_invite',
+        link: `/projects/${invitation.project_id}`,
+      },
+    });
+
+    const accessToken = jwt.sign(
+      { id: user.id, email: user.email, name: user.name },
+      JWT_SECRET,
+      { expiresIn: JWT_EXPIRES_IN }
+    );
+
+    const refreshToken = jwt.sign(
+      { id: user.id, email: user.email },
+      JWT_REFRESH_SECRET,
+      { expiresIn: JWT_REFRESH_EXPIRES_IN }
+    );
+
+    const hashedRefreshToken = await bcrypt.hash(refreshToken, 10);
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { refresh_token: hashedRefreshToken },
+    });
+
+    return {
+      message: 'Invitation accepted successfully!',
+      access_token: accessToken,
+      refresh_token: refreshToken,
+      user: formatUser(user),
+      project_id: invitation.project_id,
     };
   }
 }
