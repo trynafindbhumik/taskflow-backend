@@ -12,6 +12,9 @@ import {
 
 const JWT_SECRET = process.env.JWT_SECRET || 'taskflow_super_secret_jwt_key_2026';
 const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'taskflow_super_secret_refresh_key_2026';
+const JWT_EXPIRES_IN = (process.env.JWT_EXPIRES_IN || '7d') as any;
+const JWT_REFRESH_EXPIRES_IN = (process.env.JWT_REFRESH_EXPIRES_IN || '30d') as any;
+
 
 /**
  * Business logic service for project invitations and user acceptance onboarding.
@@ -127,13 +130,13 @@ export class InvitationsService {
       const accessToken = jwt.sign(
         { id: newUser.id, email: newUser.email, name: newUser.name },
         JWT_SECRET,
-        { expiresIn: '1h' }
+        { expiresIn: JWT_EXPIRES_IN }
       );
 
       const refreshToken = jwt.sign(
         { id: newUser.id, email: newUser.email },
         JWT_REFRESH_SECRET,
-        { expiresIn: '7d' }
+        { expiresIn: JWT_REFRESH_EXPIRES_IN }
       );
 
       const hashedRefreshToken = await bcrypt.hash(refreshToken, 10);
@@ -144,7 +147,6 @@ export class InvitationsService {
 
       return {
         message: 'Account created and invitation accepted successfully!',
-        token: accessToken,
         access_token: accessToken,
         refresh_token: refreshToken,
         user: formatUser(newUser),
