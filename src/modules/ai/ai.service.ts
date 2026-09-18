@@ -311,7 +311,8 @@ CRITICAL MANDATORY INSTRUCTIONS FOR DOCUMENT PLAN GENERATION:
     } catch {}
 
     // 5. Invoke LLM Provider (Gemini / OpenAI / Groq / Mistral / MiniMax / Ollama)
-    const llmRes = await LLMProvider.chat(TASKFLOW_SYSTEM_PROMPT, fullPrompt, historyForLlm);
+    const dynamicSystemPrompt = `${TASKFLOW_SYSTEM_PROMPT}\n\n[SYSTEM CONTEXT]: Today's date is ${new Date().toISOString().split('T')[0]}. Use this as the baseline for all generated deadlines. DO NOT generate deadlines in the past.`;
+    const llmRes = await LLMProvider.chat(dynamicSystemPrompt, fullPrompt, historyForLlm);
 
     let finalReply = llmRes.reply;
     let artifactType: 'plan' | 'stats' | 'overdue' | 'workload' | undefined;
