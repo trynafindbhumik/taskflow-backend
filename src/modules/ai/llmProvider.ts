@@ -31,7 +31,7 @@ const DEFAULT_TOOLS: ToolDefinition[] = [
   },
   {
     name: 'create_task',
-    description: 'Creates a new task in a project with optional subtasks and assignee',
+    description: 'Creates a single new task in a project. DO NOT use this tool multiple times in a row for bulk creation. For planning multiple tasks, use generate_project_proposal instead.',
     parameters: {
       type: 'object',
       properties: {
