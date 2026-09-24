@@ -145,6 +145,24 @@ export class ProjectsService {
     });
   }
 
+  static async getProjectInvitations(projectId: string) {
+    return prisma.projectInvitation.findMany({
+      where: {
+        project_id: projectId,
+        status: 'pending',
+        expires_at: { gt: new Date() },
+      },
+      select: {
+        id: true,
+        email: true,
+        status: true,
+        created_at: true,
+        expires_at: true,
+      },
+      orderBy: { created_at: 'desc' },
+    });
+  }
+
   static async inviteMembers(currentUserId: string, projectId: string, body: any) {
     const currentUser = await prisma.user.findUnique({ where: { id: currentUserId } });
     const project = await prisma.projects.findUnique({ where: { id: projectId } });
@@ -197,30 +215,33 @@ export class ProjectsService {
         }
       }
 
-      const token = crypto.randomBytes(32).toString('hex');
-      const expires_at = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-
       const existingInvitation = await prisma.projectInvitation.findFirst({
-        where: { project_id: projectId, email: targetEmail, status: 'pending' },
+        where: {
+          project_id: projectId,
+          email: targetEmail,
+          status: 'pending',
+          expires_at: { gt: new Date() },
+        },
       });
 
       if (existingInvitation) {
-        await prisma.projectInvitation.update({
-          where: { id: existingInvitation.id },
-          data: { token, expires_at },
-        });
-      } else {
-        await prisma.projectInvitation.create({
-          data: {
-            project_id: projectId,
-            inviter_id: currentUserId,
-            email: targetEmail,
-            token,
-            expires_at,
-            status: 'pending',
-          },
-        });
+        skipped.push({ email: targetEmail, reason: 'Invitation is already pending' });
+        continue;
       }
+
+      const token = crypto.randomBytes(32).toString('hex');
+      const expires_at = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+      await prisma.projectInvitation.create({
+        data: {
+          project_id: projectId,
+          inviter_id: currentUserId,
+          email: targetEmail,
+          token,
+          expires_at,
+          status: 'pending',
+        },
+      });
 
       await sendProjectInviteEmail(
         targetEmail,
@@ -236,7 +257,7 @@ export class ProjectsService {
       message:
         sent.length > 0
           ? `Successfully sent ${sent.length} invitation email${sent.length > 1 ? 's' : ''}`
-          : 'No new invitations sent',
+          : skipped[0]?.reason || 'No new invitations sent',
       sent_count: sent.length,
       skipped_count: skipped.length,
       sent,
