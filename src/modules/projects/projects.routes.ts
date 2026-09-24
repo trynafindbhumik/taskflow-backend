@@ -17,6 +17,7 @@ router.patch('/:id', authenticate, validate(updateProjectSchema), ProjectsContro
 router.delete('/:id', authenticate, ProjectsController.deleteProject);
 
 router.get('/:id/members', authenticate, ProjectsController.getProjectMembers);
+router.get('/:id/invitations', authenticate, ProjectsController.getProjectInvitations);
 router.post('/:id/members', authenticate, ProjectsController.inviteMembers);
 router.delete('/:id/members/:userId', authenticate, ProjectsController.removeMember);
 
