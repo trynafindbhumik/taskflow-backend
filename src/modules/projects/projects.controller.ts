@@ -76,6 +76,15 @@ export class ProjectsController {
     }
   }
 
+  static async getProjectInvitations(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const invitations = await ProjectsService.getProjectInvitations(req.params.id);
+      return res.status(200).json(invitations);
+    } catch (error) {
+      return next(error);
+    }
+  }
+
   static async inviteMembers(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
       const userId = req.user?.id;
